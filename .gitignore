@@ -3,7 +3,15 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+#Visual Studio Code directory
+*.vscode/
+
+#Migrations
+*.Migrations/
+
+
 # User-specific files
+*.json
 *.suo
 *.user
 *.userosscache
