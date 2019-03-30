@@ -1,0 +1,56 @@
+﻿@model CanvasRemindWebApp.Models.User
+
+
+@{
+    ViewData["Title"] = "SignUpPage";
+}
+
+<h1>SignUpPage</h1>
+
+<h4>User</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="SignUpPage">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="Name" class="control-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Email" class="control-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Phone" class="control-label"></label>
+                <input asp-for="Phone" class="form-control" />
+                <span asp-validation-for="Phone" class="text-danger"></span>            
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ServiceProvider" class="control-label"></label>
+                <br/>
+                <select asp-for="ServiceProvider">
+                    <option></option>
+                    <option value="T-Mobile">T-Mobile</option>
+                    <option value="Sprint">Sprint</option>
+                    <option value="ATT">AT&T</option>
+                    <option value="Verizon">Verizon</option>
+                    <option value="MetroPCS">MetroPCS</option>
+                </select>
+                <span asp-validation-for="ServiceProvider" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" asp-action="AddUser" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Home</a>
+</div>
+
