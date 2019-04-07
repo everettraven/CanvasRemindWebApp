@@ -56,7 +56,7 @@ namespace CanvasRemindWebApp.Controllers
         //Return the Thank You Page
         public IActionResult ThankYou()
         {
-            string name = TempData["Name"].ToString();
+            string name = HttpContext.Request.Cookies["Name"];
             ViewData["Name"] = Decrypt(name);
             return View();
         }
@@ -74,21 +74,29 @@ namespace CanvasRemindWebApp.Controllers
         {
             try
             {
-                if (ModelState.IsValid)
+                if(HttpContext.Request.Cookies[".AspNet.Consent"] == "yes")
                 {
-                    //Stores the user name and email to be used in a later function to update the user with more information
-                    user.Name = Encrypt(user.Name);
-                    user.Email = Encrypt(user.Email);
-                    user.Phone = Encrypt(user.Phone);
-                    TempData["Name"] = user.Name;
-                    TempData["Email"] = user.Email;
-                    _context.User.Add(user);
-                    await _context.SaveChangesAsync();
+                    if (ModelState.IsValid)
+                    {
+                        //Stores the user name and email to be used in a later function to update the user with more information
+                        user.Name = Encrypt(user.Name);
+                        user.Email = Encrypt(user.Email);
+                        user.Phone = Encrypt(user.Phone);
+                        Response.Cookies.Append("Name", user.Name);
+                        Response.Cookies.Append("Email", user.Email);
+                        _context.User.Add(user);
+                        await _context.SaveChangesAsync();
 
-                    //Redirect the user to the OAuth function of this Web App
-                    return Redirect("https://localhost:5001/canvasremind/OAuth");
+                        //Redirect the user to the OAuth function of this Web App
+                        return Redirect("https://localhost:5001/canvasremind/OAuth");
 
+                    }
                 }
+                else
+                {
+                    return RedirectToAction(nameof(SignUpPage));
+                }
+
 
 
             }
@@ -105,10 +113,9 @@ namespace CanvasRemindWebApp.Controllers
         {
             try
             {
-                //Set variables to the TempData stored in the AddUser function
-                string name = TempData["Name"].ToString();
-                string email = TempData["Email"].ToString();
-
+                string name = HttpContext.Request.Cookies["Name"];
+                string email = HttpContext.Request.Cookies["Email"];
+                
                 //Use the variables to find the first user with these specific attributes in the database 
                 var dbChange =  _context.User.Where(d => d.Name == name && d.Email == email).First();
 
@@ -135,12 +142,14 @@ namespace CanvasRemindWebApp.Controllers
         {
             try
             {
-                string name = TempData["Name"].ToString();
-                string email = TempData["Email"].ToString();
+                //Get the user name and email from the cookie 
+                user.Name = HttpContext.Request.Cookies["Name"];
+                user.Email = HttpContext.Request.Cookies["Email"];
 
-                user.Name = name;
-                user.Email = email;
-                _context.User.Remove(user);
+                //Set a variable to be used to delete that user from the data base
+                var userToDelete = _context.User.Where(d => d.Name == user.Name && d.Email == user.Email).First();
+                
+                _context.User.Remove(userToDelete);
 
                 await _context.SaveChangesAsync();
                 
@@ -159,7 +168,7 @@ namespace CanvasRemindWebApp.Controllers
             string ClientID = _CanvasTestAccess.Value.Client_Id;
 
             //Redirect the user to the proper OAuth page in order to get first part of the OAuth2 Workflow
-            return Redirect("http://172.18.13.39/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://localhost:5001/canvasremind/OAuth_Completed");
+            return RedirectPreserveMethod("http://192.168.122.6/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://localhost:5001/canvasremind/OAuth_Completed");
         }
 
         //Function that gets the Access Token and Refresh Token. Redirected to after the Canvas OAuth page is interacted with. 
@@ -198,7 +207,7 @@ namespace CanvasRemindWebApp.Controllers
             var content = new FormUrlEncodedContent(values);
 
             //Send a POST web request asynchronously to the Canvas API OAuth2 endpoint that returns the Access Token and Refresh Token
-            var response = await client.PostAsync("http://172.18.13.39/login/oauth2/token", content);
+            var response = await client.PostAsync("http://192.168.122.6/login/oauth2/token", content);
 
 
             //Get the response in JSON format and read it in as an OAuth object <---- Created from the OAuth.cs Class in the Parsing_Files folder
