@@ -7,15 +7,15 @@ using CanvasRemindWebApp.Models;
 using CanvasRemindWebApp.ParsingFiles;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.Serialization.Json;
 using System.Net.Http.Formatting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Headers;
 using System.Security.Cryptography;
 using System.IO;
-using System.Text;
+using Amazon.SimpleSystemsManagement;
+using Amazon.SimpleSystemsManagement.Model;
 
 namespace CanvasRemindWebApp.Controllers
 {
@@ -28,6 +28,7 @@ namespace CanvasRemindWebApp.Controllers
         //Create an IOptions variable to use as access to the Configuration JSON files
         private readonly IOptions<CanvasTestAccess> _CanvasTestAccess;
         private readonly IOptions<AESEncryption> _Aes;
+
         public CanvasRemindController(CanvasRemindWebAppContext context, IOptions<CanvasTestAccess> configuration, IOptions<AESEncryption> aes)
         {
             _context = context;
@@ -66,7 +67,6 @@ namespace CanvasRemindWebApp.Controllers
             return View();
         }
 
-
         //Function to add a user to the Database. This function is called on the submission of the Start Up Page form.
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -88,7 +88,7 @@ namespace CanvasRemindWebApp.Controllers
                         await _context.SaveChangesAsync();
 
                         //Redirect the user to the OAuth function of this Web App
-                        return Redirect("https://localhost:5001/canvasremind/OAuth");
+                        return OAuth();
 
                     }
                 }
@@ -162,17 +162,17 @@ namespace CanvasRemindWebApp.Controllers
         }
 
         //Function used to redirect a user to the Canvas OAuth2 page to authorize this application as a service they would like to use
-        public IActionResult OAuth()
+
+        private IActionResult OAuth()
         {
             //Get the Client ID for this application from the Configuration JSON file
-            string ClientID = _CanvasTestAccess.Value.Client_Id;
+            string ClientID =  _CanvasTestAccess.Value.Client_Id;
 
             //Redirect the user to the proper OAuth page in order to get first part of the OAuth2 Workflow
-            return RedirectPreserveMethod("http://192.168.122.6/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://localhost:5001/canvasremind/OAuth_Completed");
+            return Redirect("http://192.168.31.67/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://localhost:5001/canvasremind/OAuth_Completed");
         }
 
         //Function that gets the Access Token and Refresh Token. Redirected to after the Canvas OAuth page is interacted with. 
-        //Currently this function doesn't recognize a denied OAuth action. Gets the code query returned after Canvas OAuth is approved 
         public async Task<IActionResult> OAuth_Completed(string code, string error)
         {
             //Create a user variable to store access token and refresh token in. Will be passed into the UpdateUser function
@@ -180,10 +180,7 @@ namespace CanvasRemindWebApp.Controllers
 
             if(error == "access_denied")
             {
-                //asynchronously delete the user that originally signed up before the error occured
                 await DeleteUser(user);
-                
-                //Return to the error page if this occurs to let the user know there was an error in their request
                 return RedirectToAction(nameof(Error));
             }
 
@@ -197,8 +194,8 @@ namespace CanvasRemindWebApp.Controllers
             var values = new Dictionary<string, string>()
             {
                 {"grant_type", "authorization_code" },
-                {"client_id", _CanvasTestAccess.Value.Client_Id},
-                { "client_secret", _CanvasTestAccess.Value.Client_Secret},
+                {"client_id",  _CanvasTestAccess.Value.Client_Id},
+                { "client_secret",  _CanvasTestAccess.Value.Client_Secret},
                 {"redirect_uri", "https://localhost:5001/canvasremind/OAuth_Completed" },
                 {"code", code }
             };
@@ -207,12 +204,17 @@ namespace CanvasRemindWebApp.Controllers
             var content = new FormUrlEncodedContent(values);
 
             //Send a POST web request asynchronously to the Canvas API OAuth2 endpoint that returns the Access Token and Refresh Token
-            var response = await client.PostAsync("http://192.168.122.6/login/oauth2/token", content);
+            var response = await client.PostAsync("http://192.168.31.67/login/oauth2/token", content);
 
 
             //Get the response in JSON format and read it in as an OAuth object <---- Created from the OAuth.cs Class in the Parsing_Files folder
             var Stream = response.Content.ReadAsAsync<OAuth>(new[] { new JsonMediaTypeFormatter() }).Result;
-
+           
+           if(Stream.AccessToken == null || Stream.RefreshToken == null)
+           {
+               return RedirectToAction(nameof(Error));
+           }
+           
             //Add the access token  and refresh token to the user variable
             user.AccessToken = Encrypt(Stream.AccessToken);
             user.RefreshToken = Encrypt(Stream.RefreshToken);
@@ -226,12 +228,12 @@ namespace CanvasRemindWebApp.Controllers
         }
 
         //Function used to encrypt the data being brought in and stored into the database using AES encryption library
-        public string Encrypt(string input)
+        private string Encrypt(string input)
         {
             //Create the variables necessary to encrypt the data
             string EncryptedString = ""; //string to store the Base64 string that will result from encryption. This value will be returned.
-            byte[] keyByteArray = Convert.FromBase64String(_Aes.Value.Key); //Convert the Base64 string into a byte array for encryption
-            byte[] ivByteArray = Convert.FromBase64String(_Aes.Value.IV); //Convert the Base64 string into a byte array for encryption
+            byte[] keyByteArray = Convert.FromBase64String( _Aes.Value.Key); //Convert the Base64 string into a byte array for encryption
+            byte[] ivByteArray = Convert.FromBase64String( _Aes.Value.IV); //Convert the Base64 string into a byte array for encryption
             byte[] EncryptedBytes;
 
             //Instantiate an instance of an AES Encryption method
@@ -275,12 +277,12 @@ namespace CanvasRemindWebApp.Controllers
 
 
         //Function used to decrypt the necessary encrypted data using AES encryption
-        public string Decrypt(string EncryptedString)
+        private string Decrypt(string EncryptedString)
         {
             //Initialize the variables to be used 
             string DecryptedString = ""; //string to store the decrypted value
             byte[] keyByteArray = Convert.FromBase64String(_Aes.Value.Key);//Convert the Base64 string into a byte array for decryption
-            byte[] ivByteArray = Convert.FromBase64String(_Aes.Value.IV); //Convert the Base64 string into a byte array for decryption
+            byte[] ivByteArray = Convert.FromBase64String( _Aes.Value.IV); //Convert the Base64 string into a byte array for decryption
             byte[] EncryptedBytes = Convert.FromBase64String(EncryptedString); //Convert the encrypted string to a byte array for decryption
 
 
@@ -317,5 +319,22 @@ namespace CanvasRemindWebApp.Controllers
         }
 
 
+        private string GetParameterFromAWS(string parameterName)
+        {   
+            var ssmClient = new AmazonSimpleSystemsManagementClient(Amazon.RegionEndpoint.USEast2);
+            var response = ssmClient.GetParameterAsync(new GetParameterRequest
+            {
+                Name = parameterName,
+                WithDecryption = true
+                
+            });
+
+
+
+            return response.ToString();
+        }
+
+
     }
 }
+

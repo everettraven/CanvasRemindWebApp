@@ -34,17 +34,19 @@ namespace CanvasRemindWebApp
             });
 
             services.AddDistributedMemoryCache();
-
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2).AddSessionStateTempDataProvider();
-
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
             services.AddSession();
 
             services.AddDbContext<CanvasRemindWebAppContext>(options =>
-                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+                options.UseSqlServer(Configuration.GetConnectionString("RDSConnection")));
+
+           // services.Configure<CanvasWebAppSecrets>(Configuration.GetSection("CanvasWebAppSecrets"));
 
             services.Configure<CanvasTestAccess>(Configuration.GetSection("CanvasTestAccess"));
 
             services.Configure<AESEncryption>(Configuration.GetSection("AESEncryption"));
+            
+            services.Configure<AESEncryption>(Configuration.GetSection("RDSConnect"));
 
         }
 
