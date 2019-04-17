@@ -25,15 +25,12 @@ namespace CanvasRemindWebApp.Controllers
         //Create a DbContext variable to use to interact with the Entity Framework Core DB
         private readonly CanvasRemindWebAppContext _context;
         
-        //Create an IOptions variable to use as access to the Configuration JSON files
-        private readonly IOptions<CanvasTestAccess> _CanvasTestAccess;
-        private readonly IOptions<AESEncryption> _Aes;
-
-        public CanvasRemindController(CanvasRemindWebAppContext context, IOptions<CanvasTestAccess> configuration, IOptions<AESEncryption> aes)
+        //Create an IOptions variable to use as access to the Configuration files
+        private readonly IOptions<AWSParamStoreTest> _params;
+        public CanvasRemindController(CanvasRemindWebAppContext context, IOptions<AWSParamStoreTest> configuration /* IOptions<CanvasTestAccess> configuration, IOptions<AESEncryption> aes*/)
         {
             _context = context;
-            _CanvasTestAccess = configuration;
-            _Aes = aes;
+            _params = configuration;
         }
 
         //Return the Home Page
@@ -166,8 +163,7 @@ namespace CanvasRemindWebApp.Controllers
         private IActionResult OAuth()
         {
             //Get the Client ID for this application from the Configuration JSON file
-            string ClientID =  _CanvasTestAccess.Value.Client_Id;
-
+            string ClientID =  _params.Value.Client_Id;
             //Redirect the user to the proper OAuth page in order to get first part of the OAuth2 Workflow
             return Redirect("http://192.168.31.67/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://localhost:5001/canvasremind/OAuth_Completed");
         }
@@ -194,8 +190,8 @@ namespace CanvasRemindWebApp.Controllers
             var values = new Dictionary<string, string>()
             {
                 {"grant_type", "authorization_code" },
-                {"client_id",  _CanvasTestAccess.Value.Client_Id},
-                { "client_secret",  _CanvasTestAccess.Value.Client_Secret},
+                {"client_id",  _params.Value.Client_Id},
+                { "client_secret", _params.Value.Client_Secret},
                 {"redirect_uri", "https://localhost:5001/canvasremind/OAuth_Completed" },
                 {"code", code }
             };
@@ -232,8 +228,8 @@ namespace CanvasRemindWebApp.Controllers
         {
             //Create the variables necessary to encrypt the data
             string EncryptedString = ""; //string to store the Base64 string that will result from encryption. This value will be returned.
-            byte[] keyByteArray = Convert.FromBase64String( _Aes.Value.Key); //Convert the Base64 string into a byte array for encryption
-            byte[] ivByteArray = Convert.FromBase64String( _Aes.Value.IV); //Convert the Base64 string into a byte array for encryption
+            byte[] keyByteArray = Convert.FromBase64String( _params.Value.EncryptionKey); //Convert the Base64 string into a byte array for encryption
+            byte[] ivByteArray = Convert.FromBase64String( _params.Value.IV); //Convert the Base64 string into a byte array for encryption
             byte[] EncryptedBytes;
 
             //Instantiate an instance of an AES Encryption method
@@ -281,8 +277,8 @@ namespace CanvasRemindWebApp.Controllers
         {
             //Initialize the variables to be used 
             string DecryptedString = ""; //string to store the decrypted value
-            byte[] keyByteArray = Convert.FromBase64String(_Aes.Value.Key);//Convert the Base64 string into a byte array for decryption
-            byte[] ivByteArray = Convert.FromBase64String( _Aes.Value.IV); //Convert the Base64 string into a byte array for decryption
+            byte[] keyByteArray = Convert.FromBase64String(_params.Value.EncryptionKey);//Convert the Base64 string into a byte array for decryption
+            byte[] ivByteArray = Convert.FromBase64String( _params.Value.IV); //Convert the Base64 string into a byte array for decryption
             byte[] EncryptedBytes = Convert.FromBase64String(EncryptedString); //Convert the encrypted string to a byte array for decryption
 
 
@@ -316,22 +312,6 @@ namespace CanvasRemindWebApp.Controllers
 
             //Return the decrypted string
             return DecryptedString;
-        }
-
-
-        private string GetParameterFromAWS(string parameterName)
-        {   
-            var ssmClient = new AmazonSimpleSystemsManagementClient(Amazon.RegionEndpoint.USEast2);
-            var response = ssmClient.GetParameterAsync(new GetParameterRequest
-            {
-                Name = parameterName,
-                WithDecryption = true
-                
-            });
-
-
-
-            return response.ToString();
         }
 
 
