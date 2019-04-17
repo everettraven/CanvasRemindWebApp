@@ -19,6 +19,10 @@ namespace CanvasRemindWebApp
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration((context,config) => {
+                //Add the AWS Systems manager to the config settings
+                config.AddSystemsManager($"/Canvas/Test");
+            })
  
                 .UseStartup<Startup>();
     }

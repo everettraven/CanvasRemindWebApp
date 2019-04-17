@@ -37,16 +37,13 @@ namespace CanvasRemindWebApp
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
             services.AddSession();
 
+            //Setup DbConnection option from AWS Parameter Store
             services.AddDbContext<CanvasRemindWebAppContext>(options =>
-                options.UseSqlServer(Configuration.GetConnectionString("RDSConnection")));
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
 
-           // services.Configure<CanvasWebAppSecrets>(Configuration.GetSection("CanvasWebAppSecrets"));
+            //Get the AWS Parameter store values and parse them with the AWSParamStoreTest model created
+            services.Configure<AWSParamStoreTest>(Configuration.GetSection("CanvasWebAppSecrets"));
 
-            services.Configure<CanvasTestAccess>(Configuration.GetSection("CanvasTestAccess"));
-
-            services.Configure<AESEncryption>(Configuration.GetSection("AESEncryption"));
-            
-            services.Configure<AESEncryption>(Configuration.GetSection("RDSConnect"));
 
         }
 
