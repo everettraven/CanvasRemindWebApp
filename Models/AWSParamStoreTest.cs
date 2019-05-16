@@ -17,5 +17,7 @@ namespace CanvasRemindWebApp.Models
 
         public string IV {get; set;}
 
+        public string CanvasURL {get; set;}
+
     }
 }

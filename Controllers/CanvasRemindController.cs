@@ -162,70 +162,88 @@ namespace CanvasRemindWebApp.Controllers
 
         private IActionResult OAuth()
         {
-            //Get the Client ID for this application from the Configuration JSON file
-            string ClientID =  _params.Value.Client_Id;
-            //Redirect the user to the proper OAuth page in order to get first part of the OAuth2 Workflow
-            return Redirect("http://192.168.31.67/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://localhost:5001/canvasremind/OAuth_Completed");
+            try
+            {
+                //Get the Client ID for this application from the Configuration JSON file
+                string ClientID =  _params.Value.Client_Id;
+                //Redirect the user to the proper OAuth page in order to get first part of the OAuth2 Workflow
+                return Redirect(_params.Value.CanvasURL + "/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://canvasremindwebapptest-dev.us-east-2.elasticbeanstalk.com/canvasremind/OAuth_Completed");
+        
+            }
+            catch(Exception ex)
+            {
+                return RedirectToAction(nameof(Error));
+            }
         }
 
         //Function that gets the Access Token and Refresh Token. Redirected to after the Canvas OAuth page is interacted with. 
         public async Task<IActionResult> OAuth_Completed(string code, string error)
         {
-            //Create a user variable to store access token and refresh token in. Will be passed into the UpdateUser function
-            User user = new User();
-
-            if(error == "access_denied")
+            try
             {
-                await DeleteUser(user);
+                //Create a user variable to store access token and refresh token in. Will be passed into the UpdateUser function
+                User user = new User();
+
+                if(error == "access_denied")
+                {
+                    await DeleteUser(user);
+                    return RedirectToAction(nameof(Error));
+                }
+
+                //Create an HttpClient to make web requests
+                HttpClient client = new HttpClient();
+
+                //Serializer to read incoming JSON
+                var Serializer = new DataContractJsonSerializer(typeof(List<OAuth>));
+
+                //Values that will be sent through the header during the POST request to get the Access Token and Refresh Token
+                var values = new Dictionary<string, string>()
+                {
+                    {"grant_type", "authorization_code" },
+                    {"client_id",  _params.Value.Client_Id},
+                    { "client_secret", _params.Value.Client_Secret},
+                    {"redirect_uri", "https://canvasremindwebapptest-dev.us-east-2.elasticbeanstalk.com/canvasremind/OAuth_Completed" },
+                    {"code", code }
+                };
+
+                //Form encode values so it is sent through the header to the url
+                var content = new FormUrlEncodedContent(values);
+
+                //Send a POST web request asynchronously to the Canvas API OAuth2 endpoint that returns the Access Token and Refresh Token
+                var response = await client.PostAsync(_params.Value.CanvasURL + "/login/oauth2/token", content);
+
+
+                //Get the response in JSON format and read it in as an OAuth object <---- Created from the OAuth.cs Class in the Parsing_Files folder
+                var Stream = response.Content.ReadAsAsync<OAuth>(new[] { new JsonMediaTypeFormatter() }).Result;
+           
+                if(Stream.AccessToken == null || Stream.RefreshToken == null)
+                {
+                    return RedirectToAction(nameof(Error));
+                }
+           
+                //Add the access token  and refresh token to the user variable
+                user.AccessToken = Encrypt(Stream.AccessToken);
+                user.RefreshToken = Encrypt(Stream.RefreshToken);
+
+
+
+                //asynchronously update the user signing up for the service
+                await UpdateUser(user);
+                return RedirectToAction(nameof(ThankYou));
+
+
+            }
+            catch(Exception ex)
+            {
                 return RedirectToAction(nameof(Error));
             }
-
-            //Create an HttpClient to make web requests
-            HttpClient client = new HttpClient();
-
-            //Serializer to read incoming JSON
-            var Serializer = new DataContractJsonSerializer(typeof(List<OAuth>));
-
-            //Values that will be sent through the header during the POST request to get the Access Token and Refresh Token
-            var values = new Dictionary<string, string>()
-            {
-                {"grant_type", "authorization_code" },
-                {"client_id",  _params.Value.Client_Id},
-                { "client_secret", _params.Value.Client_Secret},
-                {"redirect_uri", "https://localhost:5001/canvasremind/OAuth_Completed" },
-                {"code", code }
-            };
-
-            //Form encode values so it is sent through the header to the url
-            var content = new FormUrlEncodedContent(values);
-
-            //Send a POST web request asynchronously to the Canvas API OAuth2 endpoint that returns the Access Token and Refresh Token
-            var response = await client.PostAsync("http://192.168.31.67/login/oauth2/token", content);
-
-
-            //Get the response in JSON format and read it in as an OAuth object <---- Created from the OAuth.cs Class in the Parsing_Files folder
-            var Stream = response.Content.ReadAsAsync<OAuth>(new[] { new JsonMediaTypeFormatter() }).Result;
            
-           if(Stream.AccessToken == null || Stream.RefreshToken == null)
-           {
-               return RedirectToAction(nameof(Error));
-           }
-           
-            //Add the access token  and refresh token to the user variable
-            user.AccessToken = Encrypt(Stream.AccessToken);
-            user.RefreshToken = Encrypt(Stream.RefreshToken);
-
-
-
-            //asynchronously update the user signing up for the service
-            await UpdateUser(user);
-            return RedirectToAction(nameof(ThankYou));
-
         }
 
         //Function used to encrypt the data being brought in and stored into the database using AES encryption library
         private string Encrypt(string input)
         {
+
             //Create the variables necessary to encrypt the data
             string EncryptedString = ""; //string to store the Base64 string that will result from encryption. This value will be returned.
             byte[] keyByteArray = Convert.FromBase64String( _params.Value.EncryptionKey); //Convert the Base64 string into a byte array for encryption

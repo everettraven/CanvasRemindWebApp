@@ -42,8 +42,7 @@ namespace CanvasRemindWebApp
                 options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
 
             //Get the AWS Parameter store values and parse them with the AWSParamStoreTest model created
-            services.Configure<AWSParamStoreTest>(Configuration.GetSection("CanvasWebAppSecrets"));
-
+            services.Configure<AWSParamStoreTest>(Configuration.GetSection("AppSecrets"));
 
         }
 
