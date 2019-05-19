@@ -71,6 +71,7 @@ namespace CanvasRemindWebApp.Controllers
         {
             try
             {
+                
                 if(HttpContext.Request.Cookies[".AspNet.Consent"] == "yes")
                 {
                     if (ModelState.IsValid)
@@ -167,7 +168,7 @@ namespace CanvasRemindWebApp.Controllers
                 //Get the Client ID for this application from the Configuration JSON file
                 string ClientID =  _params.Value.Client_Id;
                 //Redirect the user to the proper OAuth page in order to get first part of the OAuth2 Workflow
-                return Redirect(_params.Value.CanvasURL + "/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=https://canvasremindwebapptest-dev.us-east-2.elasticbeanstalk.com/canvasremind/OAuth_Completed");
+                return Redirect("https://" +_params.Value.CanvasURL + "/login/oauth2/auth?client_id=" + ClientID + "&response_type=code&redirect_uri=http://canvasremindwebapp-dev.us-east-2.elasticbeanstalk.com/CanvasRemind/OAuth_Completed");
         
             }
             catch(Exception ex)
@@ -193,31 +194,33 @@ namespace CanvasRemindWebApp.Controllers
                 //Create an HttpClient to make web requests
                 HttpClient client = new HttpClient();
 
+
                 //Serializer to read incoming JSON
                 var Serializer = new DataContractJsonSerializer(typeof(List<OAuth>));
 
                 //Values that will be sent through the header during the POST request to get the Access Token and Refresh Token
                 var values = new Dictionary<string, string>()
                 {
-                    {"grant_type", "authorization_code" },
+                    {"grant_type", "authorization_code"},
                     {"client_id",  _params.Value.Client_Id},
-                    { "client_secret", _params.Value.Client_Secret},
-                    {"redirect_uri", "https://canvasremindwebapptest-dev.us-east-2.elasticbeanstalk.com/canvasremind/OAuth_Completed" },
-                    {"code", code }
+                    {"client_secret", _params.Value.Client_Secret},
+                    {"redirect_uri", "http://canvasremindwebapp-dev.us-east-2.elasticbeanstalk.com/CanvasRemind/OAuth_Completed" },
+                    {"code", code}
                 };
 
                 //Form encode values so it is sent through the header to the url
                 var content = new FormUrlEncodedContent(values);
 
                 //Send a POST web request asynchronously to the Canvas API OAuth2 endpoint that returns the Access Token and Refresh Token
-                var response = await client.PostAsync(_params.Value.CanvasURL + "/login/oauth2/token", content);
+                var response = await client.PostAsync("https://" +_params.Value.CanvasURL + "/login/oauth2/token", content);
 
 
                 //Get the response in JSON format and read it in as an OAuth object <---- Created from the OAuth.cs Class in the Parsing_Files folder
                 var Stream = response.Content.ReadAsAsync<OAuth>(new[] { new JsonMediaTypeFormatter() }).Result;
-           
+    
                 if(Stream.AccessToken == null || Stream.RefreshToken == null)
                 {
+                    await DeleteUser(user);
                     return RedirectToAction(nameof(Error));
                 }
            
@@ -229,12 +232,15 @@ namespace CanvasRemindWebApp.Controllers
 
                 //asynchronously update the user signing up for the service
                 await UpdateUser(user);
+            
                 return RedirectToAction(nameof(ThankYou));
 
 
             }
             catch(Exception ex)
             {
+                User user = new User();
+                await DeleteUser(user);
                 return RedirectToAction(nameof(Error));
             }
            

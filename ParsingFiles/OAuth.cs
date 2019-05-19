@@ -18,5 +18,11 @@ namespace CanvasRemindWebApp.ParsingFiles
             [DataMember(Name = "refresh_token")]
             public string RefreshToken { get; set; }
 
+            [DataMember(Name = "error")]
+            public string Error {get; set;}
+
+            [DataMember(Name = "error_description")]
+            public string ErrorDescription {get; set;}
+
     }
 }
